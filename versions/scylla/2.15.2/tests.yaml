@@ -1,0 +1,23 @@
+# this is an example
+# put an tests.yaml file in a version folder to use it
+#
+tests:
+#- AuthenticationTests*
+- ConsistencyTwoNodeClusterTests.Integration_Cassandra_SimpleEachQuorum
+- ControlConnectionTests.Integration_Cassandra_TopologyChange
+- ControlConnectionTwoNodeClusterTests.Integration_Cassandra_Reconnection
+#- CustomPayloadTests*:DbaasTests*
+#- DcAwarePolicyTest.Integration_Cassandra_UsedHostsRemoteDc
+#- ExecutionProfileTest.Integration_Cassandra_RequestTimeout
+#- ExecutionProfileTest.Integration_Cassandra_SpeculativeExecutionPolicy
+#- MetricsTests.Integration_Cassandra_SpeculativeExecutionRequests
+#- PreparedTests.Integration_Cassandra_PreparedIDUnchangedDuringReprepare
+#- ServerSideFailureTests.Integration_Cassandra_Warning
+#- ServerSideFailureTests.Integration_Cassandra_ErrorFunctionFailure
+#- ServerSideFailureTests.Integration_Cassandra_ErrorFunctionAlreadyExists
+#- SessionTest.Integration_Cassandra_ExternalHostListener
+#- SchemaMetadataTest*
+#- SchemaNullStringApiArgsTest*
+#- SpeculativeExecutionTests*
+#- SslTests*
+#- SslClientAuthenticationTests*
