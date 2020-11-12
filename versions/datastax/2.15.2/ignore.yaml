@@ -1,11 +1,12 @@
 # this is an example
-# put an tests.yaml file in a version folder to use it
+# put an ignore.yaml file in a version folder to use it
 #
 tests:
+  - AuthenticationTests*
 #- AuthenticationTests*
-- ConsistencyTwoNodeClusterTests.Integration_Cassandra_SimpleEachQuorum
-- ControlConnectionTests.Integration_Cassandra_TopologyChange
-- ControlConnectionTwoNodeClusterTests.Integration_Cassandra_Reconnection
+#- ConsistencyTwoNodeClusterTests.Integration_Cassandra_SimpleEachQuorum
+#- ControlConnectionTests.Integration_Cassandra_TopologyChange
+#- ControlConnectionTwoNodeClusterTests.Integration_Cassandra_Reconnection
 #- CustomPayloadTests*:DbaasTests*
 #- DcAwarePolicyTest.Integration_Cassandra_UsedHostsRemoteDc
 #- ExecutionProfileTest.Integration_Cassandra_RequestTimeout

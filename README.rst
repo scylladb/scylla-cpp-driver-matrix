@@ -19,6 +19,6 @@ Keep in mind that all those repos should be under a same base directory
 
 6) Execute the main.py wrapper like::
 
-    python3 main.py ../python-driver ../scylla --tests tests.integration.standard
+    python3 main.py driverCheckoutDir scyllaCheckoutDir --driver-type driverType --versions versions --scylla-version scylla_version"
 
 Then the tests should run.
