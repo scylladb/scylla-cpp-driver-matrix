@@ -1,0 +1,45 @@
+diff --git a/tests/src/integration/ccm/bridge.cpp b/tests/src/integration/ccm/bridge.cpp
+index 9b03ce87..4f3fcf7c 100644
+--- a/tests/src/integration/ccm/bridge.cpp
++++ b/tests/src/integration/ccm/bridge.cpp
+@@ -300,8 +300,22 @@ bool CCM::Bridge::create_cluster(std::vector<unsigned short> data_center_nodes,
+     // Create the cluster create command and execute
+     std::vector<std::string> create_command;
+     create_command.push_back("create");
++
++    // Reading the scylla relocatable version of of environment variable
++    char const* _scylla_version = std::getenv("SCYLLA_VERSION");
++    std::string scylla_version = _scylla_version == NULL ? std::string() : std::string(_scylla_version);
++
++    std::string cluster_nodes = generate_cluster_nodes(data_center_nodes);
++    std::string cluster_ip_prefix = get_ip_prefix();
++    create_command.push_back("-n");
++    create_command.push_back(cluster_nodes);
++    create_command.push_back("-i");
++    create_command.push_back(cluster_ip_prefix);
++
+     if (use_install_dir_ && !install_dir_.empty()) {
+       create_command.push_back("--install-dir=" + install_dir_);
++    } else if (!scylla_version.empty()) {
++      create_command.push_back("--version="+scylla_version);
+     } else {
+       create_command.push_back("-v");
+       if (is_cassandra()) {
+@@ -374,6 +388,8 @@ bool CCM::Bridge::create_cluster(std::vector<unsigned short> data_center_nodes,
+     }
+
+     // Create the cluster populate command and execute
++    /* Moved those parameters into the create command, since scylla-ccm doesn't support relocatable
++       in a seperated populate command
+     std::string cluster_nodes = generate_cluster_nodes(data_center_nodes);
+     std::string cluster_ip_prefix = get_ip_prefix();
+     std::vector<std::string> populate_command;
+@@ -386,7 +402,7 @@ bool CCM::Bridge::create_cluster(std::vector<unsigned short> data_center_nodes,
+       populate_command.push_back("--vnodes");
+     }
+     execute_ccm_command(populate_command);
+-
++    */
+     // Update the cluster configuration (set num_tokens)
+     if (with_vnodes) {
+       // Maximum number of tokens is 1536

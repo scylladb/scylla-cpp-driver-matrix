@@ -1,15 +1,10 @@
 # this is an example
 # put an ignore.yaml file in a version folder to use it
 #
-# tests:
-#  - tests.path.to.test_module.TestClass.test_one
-#  - tests.path.to.test_module.TestClass.test_two
-#  - etc.
-#
-#  here's a real example for version 3.5.0
 tests:
-#- AuthenticationTests*
-- ConsistencyTwoNodeClusterTests.Integration_Cassandra_SimpleEachQuorum
+  - AuthenticationTests*
+  - AsyncTests*
+#- ConsistencyTwoNodeClusterTests.Integration_Cassandra_SimpleEachQuorum
 #- ControlConnectionTests.Integration_Cassandra_TopologyChange
 #- ControlConnectionTwoNodeClusterTests.Integration_Cassandra_Reconnection
 #- CustomPayloadTests*:DbaasTests*

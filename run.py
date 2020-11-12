@@ -10,7 +10,8 @@ from typing import NamedTuple
 
 
 class TestResults(NamedTuple):
-    tests: int
+    running_tests: int # how many tests should be run
+    ran_tests: int # how many tests were run
     failed: int
     passed: int
     returncode: int
@@ -18,15 +19,15 @@ class TestResults(NamedTuple):
 
 class Run:
 
-    def __init__(self, cpp_driver_git: str, scylla_install_dir: str, driver_type: str, tag: str, protocol: str,
+    def __init__(self, cpp_driver_git: str, scylla_install_dir: str, driver_type: str, tag: str,
                  scylla_version: str=None):
         self._tag = tag
         self._cpp_driver_git = cpp_driver_git
         self._scylla_install_dir = scylla_install_dir
         self._scylla_version = scylla_version
-        self._protocol = protocol
         self._version_folder = None
         self.driver_type = driver_type
+        logging.info(f'DRIVER TYPE: {self.driver_type}')
         if self.driver_type == 'scylla':
             # this target ("CASSANDRA") is adapted to work with scylla
             self._category = 'CASSANDRA'
@@ -70,25 +71,18 @@ class Run:
 
     def _testsFile(self):
         here = os.path.dirname(__file__)
-        return os.path.join(here, 'versions', self.version_folder, 'tests.yaml')
+        return os.path.join(here, 'versions', self.version_folder, 'ignore.yaml')
 
     def _testsList(self):
         ignore_tests = []
         with open(self._testsFile()) as f:
             content = yaml.load(f)
-            ignore_tests.extend(content['tests'])
+            if 'tests' in content:
+                ignore_tests.extend(content['tests'])
         return ignore_tests
 
-    # def _environment(self):
-    #     result = {}
-    #     result.update(os.environ)
-    #     if self._scylla_version:
-    #         result['SCYLLA_VERSION'] = self._scylla_version
-    #     else:
-    #         result['INSTALL_DIRECTORY'] = self._scylla_install_dir
-    #     return result
-
     def _apply_patch(self):
+        output = None
         try:
             patch_file = os.path.join(self.version_folder, 'patch')
 
@@ -103,11 +97,17 @@ class Run:
                 return True
 
             command = "patch -p1 -i {}".format(patch_file)
-            subprocess.check_call(command, shell=True)
+            output = subprocess.run(command, shell=True, capture_output=True)
+            # subprocess.check_call(command, shell=True)
             self.run_compile_after_patch = True
             return True
         except Exception as exc:
-            logging.error("Failed to apply patch to version {}, with: {}".format(self._tag, str(exc)))
+            if isinstance(output, subprocess.CompletedProcess):
+                if 'Reversed (or previously applied) patch detected' in output.stdout:
+                    self.run_compile_after_patch = True
+                    return True
+
+            logging.error("Failed to apply patch to version %s, with: %s" % (self._tag, str(exc)))
             return False
 
     def compile_tests(self):
@@ -129,17 +129,19 @@ class Run:
                 subprocess.check_call('git checkout {}-dse'.format(self._tag), shell=True)
             return True
         except Exception as exc:
-            logging.error("Failed to branch for version {}, with: {}".format(self._tag, str(exc)))
-            return False
+            # TODO: we have no branches (version) yes. return False and change the message when
+            #  the version will be created
+            logging.error("Failed to branch for version %s, with: %s. Continue with 'master'" % (self._tag, str(exc)))
+            return True
 
     def _publish_fake_result(self):
-        return TestResults(testcases=0, failed=0, passed=0, returncode=0, error='error')
+        return TestResults(running_tests=0, ran_tests=0, failed=0, passed=0, returncode=0, error='error')
 
     def run(self) -> TestResults:
         os.chdir(self._cpp_driver_git)
 
-        # if not self._checkout_branch():
-        #     return self._publish_fake_result()
+        if not self._checkout_branch():
+            return self._publish_fake_result()
 
         if not self._apply_patch():
             return self._publish_fake_result()
@@ -147,22 +149,33 @@ class Run:
         if self.run_compile_after_patch:
             self.compile_tests()
 
-        gtest_filter = ':'.join(self._testsList())
-        cmd = f'{self._cpp_driver_git}/build/cassandra-integration-tests --install-dir={self._scylla_install_dir} ' \
-              f'--version={self._tag} --category={self._category} --verbose=ccm --gtest_filter={gtest_filter}'
+        # To filter out the test add "minus" before the list of ignored tests
+        gtest_filter = f"-{':'.join(self._testsList())}" if self._testsList() else ''
+
+        # If run test using relocatable packages, the SCYLLA_VERSION and pathes to relocatables will be
+        # taken from environment variables
+        # otherwize set where is compiled scylla
+        use_install_dir = f"--install-dir={self._scylla_install_dir}" if not self._scylla_version else ''
+
+        cmd = f'{self._cpp_driver_git}/build/cassandra-integration-tests {use_install_dir} ' \
+              f'--version={self._tag} --category={self._category} --verbose=ccm --gtest_filter=*{gtest_filter}'
         logging.info(cmd)
         result = subprocess.run(cmd, shell=True, capture_output=True)
 
         # Print command output in the log
         logging.info(result.stdout.decode())
         logging.info(result.stderr.decode())
-        # self.logging_cmd_output(result.stdout)
-        # self.logging_cmd_output(result.stderr)
 
         return self.analize_results(result.stdout.decode(), result.stderr.decode(), result.returncode)
 
     def analize_results(self, stdout:str, stderr:str, returncode:int) -> TestResults:
-        passed_tests = failed_tests = ran_tests = 0
+        running_tests = passed_tests = failed_tests = ran_tests = 0
+
+        # How many test cases should be run
+        search_result = re.search(r"Running (\d+) tests from (\d+) test cases", stdout)
+        if search_result:
+            running_tests = int(search_result.group(1))
+
         search_result = re.search(r"\[[ ]{2}PASSED[ ]{2}] (\d+) test", stdout)
         if search_result:
             passed_tests = int(search_result.group(1))
@@ -178,12 +191,5 @@ class Run:
 
         error = stderr if returncode != 0 else ''
 
-        return TestResults(tests=ran_tests, failed=failed_tests, passed=passed_tests, returncode=returncode,
-                           error=error)
-
-    # @staticmethod
-    # def logging_cmd_output(outstr: bytes):
-    #     for out in outstr.decode().split("\n"):
-    #         logging.info(out)
-    #
-    #     logging.info('')
+        return TestResults(running_tests=running_tests, ran_tests=ran_tests, failed=failed_tests, passed=passed_tests,
+                           returncode=returncode, error=error)
