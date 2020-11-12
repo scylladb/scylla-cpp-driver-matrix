@@ -2,7 +2,7 @@
 set -e
 
 help_text="
-$(basename $0) - Run java-driver integration tests over scylla using docker
+$(basename $0) - Run cpp-driver integration tests over scylla using docker
     Optional values can be set via environment variables
     Running dtest from scylla source code :
         CASSANDRA_DIR
@@ -27,32 +27,41 @@ $(basename $0) - Run java-driver integration tests over scylla using docker
     Other options:
         CCM_DIR
             directory of scylla ccm, should be already compiled. defaults to '../scylla-ccm'
-    ./run_test.sh mvn test
+    ./run_test.sh python3 main.py params
 "
 
 CPP_DRIVER_ORIG_DIR=$3
-
+# CPP driver folder (scylla or datastax
+echo "CPP_DRIVER_ORIG_DIR: ${CPP_DRIVER_ORIG_DIR}"
 export CPP_MATRIX_DIR=${CPP_MATRIX_DIR:-`pwd`}
 export CPP_DRIVER_DIR=${CPP_DRIVER_DIR:-`pwd`/../cpp-driver}
-export INSTALL_DIRECTORY=${INSTALL_DIRECTORY:-`pwd`/../scylla}
-export CASSANDRA_DIR=${CASSANDRA_DIR:-$INSTALL_DIRECTORY/build/release}
+export CASSANDRA_DIR=${CASSANDRA_DIR:-`pwd`/../scylla}
+SCYLLA_ROOT_DIR=$(echo $CASSANDRA_DIR | sed 's|/build/.*||')
+
+# if CASSANDRA_DIR didn't point to specific variant default to release
+if [[ ${CASSANDRA_DIR} == ${SCYLLA_ROOT_DIR} ]]; then
+    export CASSANDRA_DIR=${CASSANDRA_DIR}/build/release
+fi
 export TOOLS_JAVA_DIR=${TOOLS_JAVA_DIR:-`pwd`/../scylla-tools-java}
 export JMX_DIR=${JMX_DIR:-`pwd`/../scylla-jmx}
-#export DTEST_DIR=${DTEST_DIR:-`pwd`}
 export CCM_DIR=${CCM_DIR:-`pwd`/../scylla-ccm}
-export SCYLLA_DBUILD_SO_DIR=${SCYLLA_DBUILD_SO_DIR:-${INSTALL_DIRECTORY}/dynamic_libs}
+export SCYLLA_DBUILD_SO_DIR=${SCYLLA_DBUILD_SO_DIR:-${CASSANDRA_DIR}/dynamic_libs}
 
+mkdir -p ${HOME}/.ccm
+mkdir -p ${HOME}/.m2
+mkdir -p ${HOME}/.local/lib
 
-if [[ ! -d ${CPP_MATRIX_DIR} ]]; then
-    echo -e "\e[31m\$CPP_MATRIX_DIR = $CPP_MATRIX_DIR doesn't exist\e[0m"
-    echo "${help_text}"
-    exit 1
-fi
-if [[ ! -d ${CCM_DIR} ]]; then
-    echo -e "\e[31m\$CCM_DIR = $CCM_DIR doesn't exist\e[0m"
-    echo "${help_text}"
-    exit 1
-fi
+function check_directory_exists()
+{
+    if [[ ! -d ${!1} ]]; then
+        echo -e "\e[31m\$$1 = ${!1} directory not found\e[0m"
+        echo "${help_text}"
+        exit 1
+    fi
+}
+
+check_directory_exists CPP_MATRIX_DIR
+check_directory_exists CCM_DIR
 
 if [[ ! -d ${HOME}/.ccm ]]; then
     mkdir -p ${HOME}/.ccm
@@ -68,40 +77,35 @@ else
 WORKSPACE_MNT=""
 fi
 
+echo "SCYLLA_VERSION: ${SCYLLA_VERSION}"
 if [[ -z ${SCYLLA_VERSION} ]]; then
+    # Use locally built scylla from source
 
-    if [[ ! -d ${TOOLS_JAVA_DIR} ]]; then
-        echo -e "\e[31m\$TOOLS_JAVA_DIR = $TOOLS_JAVA_DIR doesn't exist\e[0m"
-        echo "${help_text}"
-        exit 1
-    fi
-    if [[ ! -d ${JMX_DIR} ]]; then
-        echo -e "\e[31m\$JMX_DIR = $JMX_DIR doesn't exist\e[0m"
-        echo "${help_text}"
-        exit 1
-    fi
+    check_directory_exists CASSANDRA_DIR
+    check_directory_exists TOOLS_JAVA_DIR
+    check_directory_exists JMX_DIR
 
     if [[ ! -d ${SCYLLA_DBUILD_SO_DIR} ]]; then
         echo "scylla was built with dbuild, and SCYLLA_DBUILD_SO_DIR wasn't supplied or exists"
-        cd ${INSTALL_DIRECTORY}
         set +e
-        ./tools/toolchain/dbuild -v ${CPP_MATRIX_DIR}/scripts/dbuild_collect_so.sh:/bin/dbuild_collect_so.sh -- dbuild_collect_so.sh build/`basename ${CASSANDRA_DIR}`/scylla dynamic_libs/
+        ${SCYLLA_ROOT_DIR}/tools/toolchain/dbuild -v ${CASSANDRA_DIR}:${CASSANDRA_DIR} -v ${SCYLLA_JAVA_DRIVER_MATRIX_DIR}/scripts/dbuild_collect_so.sh:/bin/dbuild_collect_so.sh -- dbuild_collect_so.sh  ${CASSANDRA_DIR}/scylla ${SCYLLA_DBUILD_SO_DIR}
         set -e
-        cd -
     fi
 
     DOCKER_COMMAND_PARAMS="
-    -v ${INSTALL_DIRECTORY}:${INSTALL_DIRECTORY} \
+    -v ${SCYLLA_ROOT_DIR}:${SCYLLA_ROOT_DIR} \
     -v ${TOOLS_JAVA_DIR}:${TOOLS_JAVA_DIR} \
     -v ${JMX_DIR}:${JMX_DIR} \
-    -e SCYLLA_DBUILD_SO_DIR
+    -e SCYLLA_DBUILD_SO_DIR \
+    -e CASSANDRA_DIR
     "
-
 else
+    # Use locally built scylla with relocatable package
     DOCKER_COMMAND_PARAMS="
-    -e SCYLLA_VERSION=${SCYLLA_VERSION} \
-    -e SCYLLA_JAVA_TOOLS_PACKAGE=${SCYLLA_JAVA_TOOLS_PACKAGE} \
-    -e SCYLLA_JMX_PACKAGE=${SCYLLA_JMX_PACKAGE}
+    -e SCYLLA_VERSION \
+    -e SCYLLA_CORE_PACKAGE \
+    -e SCYLLA_JAVA_TOOLS_PACKAGE \
+    -e SCYLLA_JMX_PACKAGE
     "
 fi
 
@@ -137,12 +141,11 @@ docker_cmd="docker run --detach \
     -v ${HOME}/.local:${HOME}/.local \
     -v ${HOME}/.ccm:${HOME}/.ccm \
     --network=bridge --privileged \
-    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'sudo yum install cmake libuv-devel openssl-devel krb5-devel;
-          yum install patch;
+    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'sudo yum install -y cmake libuv-devel openssl-devel krb5-devel patch;
           cd ${CPP_DRIVER_ORIG_DIR};mkdir -p build && cd build && cmake -DCASS_BUILD_INTEGRATION_TESTS=ON .. && make;
-          pwd;ls -l;
           pip3 install --force-reinstall --user -e ${CCM_DIR} ;
-          export PATH=\$PATH:\${HOME}/.local/bin:${CPP_DRIVER_DIR}/build/cassandra-integration-tests ;
+          echo SCYLLA_VERSION is \$SCYLLA_VERSION;
+          export PATH=\$PATH:\${HOME}/.local/bin:${CPP_DRIVER_DIR}/build/cassandra-integration-tests:/usr/bin/patch ;
           echo \$PATH;
           cd ${CPP_MATRIX_DIR};
           $*'"
