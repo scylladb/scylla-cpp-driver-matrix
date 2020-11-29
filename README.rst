@@ -19,6 +19,6 @@ Keep in mind that all those repos should be under a same base directory
 
 6) Execute the main.py wrapper like::
 
-    python3 main.py driverCheckoutDir scyllaCheckoutDir --driver-type driverType --versions versions --scylla-version scylla_version"
+    python3 main.py <CPP driver dir> <Scylla dir> --driver-type <cassandra or datastax> --versions <tests CPP driver version> --scylla-version <scylla_version - if run test using relocatable packages>"
 
 Then the tests should run.
