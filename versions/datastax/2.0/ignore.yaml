@@ -12,6 +12,7 @@ tests:
   - ExecutionProfileTest.Integration_Cassandra_RequestTimeout
   - ExecutionProfileTest.Integration_Cassandra_SpeculativeExecutionPolicy
   - MetricsTests.Integration_Cassandra_SpeculativeExecutionRequests
+  - MetricsTests.Integration_Cassandra_StatsConnections
   - PreparedTests.Integration_Cassandra_PreparedIDUnchangedDuringReprepare
   - ServerSideFailureTests.Integration_Cassandra_Warning
   - ServerSideFailureTests.Integration_Cassandra_ErrorFunctionFailure

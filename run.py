@@ -150,9 +150,6 @@ class Run:
         # gtest_filter = "BasicsTests*"
         gtest_filter = f"-{':'.join(self._testsList())}" if self._testsList() else '*'
 
-        logging.info(f"SCYLLA_CORE_PACKAGE: {os.environ.get('SCYLLA_CORE_PACKAGE')}")
-        logging.info(f"SCYLLA_JMX_PACKAGE: {os.environ.get('SCYLLA_JMX_PACKAGE')}")
-        logging.info(f"SCYLLA_JAVA_TOOLS_PACKAGE: {os.environ.get('SCYLLA_JAVA_TOOLS_PACKAGE')}")
         # If run test using relocatable packages, the SCYLLA_VERSION and pathes to relocatables will be
         # taken from environment variables
         # otherwize set where is compiled scylla
