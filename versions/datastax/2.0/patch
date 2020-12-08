@@ -1,3 +1,265 @@
+diff --git a/tests/src/integration/ccm/bridge.cpp b/tests/src/integration/ccm/bridge.cpp
+index 9b03ce87..8b2521a8 100644
+--- a/tests/src/integration/ccm/bridge.cpp
++++ b/tests/src/integration/ccm/bridge.cpp
+@@ -13,6 +13,7 @@
+   See the License for the specific language governing permissions and
+   limitations under the License.
+ */
++// Copyright by ScyllaDB (c) 2020
+
+ #ifdef _WIN32
+ // Enable memory leak detection
+@@ -300,6 +301,7 @@ bool CCM::Bridge::create_cluster(std::vector<unsigned short> data_center_nodes,
+     // Create the cluster create command and execute
+     std::vector<std::string> create_command;
+     create_command.push_back("create");
++    create_command.push_back("--scylla");
+     if (use_install_dir_ && !install_dir_.empty()) {
+       create_command.push_back("--install-dir=" + install_dir_);
+     } else {
+@@ -1481,15 +1483,17 @@ CCM::Bridge::generate_create_updateconf_command(CassVersion cassandra_version) {
+     }
+   }
+
++  // Commented out for Scylla:
+   // Create Cassandra version specific updated (C* 2.2+)
+-  if (cassandra_version >= "2.2.0") {
+-    updateconf_command.push_back("enable_user_defined_functions:true");
+-  }
++  //if (cassandra_version >= "2.2.0") {
++  //  updateconf_command.push_back("experimental_features:udf");
++  //}
+
++  // Commented out for Scylla:
+   // Create Cassandra version specific updated (C* 3.0+)
+-  if (cassandra_version >= "3.0.0") {
+-    updateconf_command.push_back("enable_scripted_user_defined_functions:true");
+-  }
++  //if (cassandra_version >= "3.0.0") {
++  //  updateconf_command.push_back("enable_scripted_user_defined_functions:true");
++  //}
+
+   return updateconf_command;
+ }
+--
+2.14.3
+diff --git a/tests/src/integration/ccm/bridge.cpp b/tests/src/integration/ccm/bridge.cpp
+index 8b2521a8..592a66e9 100644
+--- a/tests/src/integration/ccm/bridge.cpp
++++ b/tests/src/integration/ccm/bridge.cpp
+@@ -112,7 +112,8 @@ CCM::Bridge::Bridge(
+     const std::string& host /*= DEFAULT_HOST*/, short port /*= DEFAULT_REMOTE_DEPLOYMENT_PORT*/,
+     const std::string& username /*= DEFAULT_USERNAME*/,
+     const std::string& password /*= DEFAULT_PASSWORD*/, const std::string& public_key /*= ""*/,
+-    const std::string& private_key /*= ""*/, bool is_verbose /*= DEFAULT_IS_VERBOSE*/)
++    const std::string& private_key /*= ""*/, bool is_verbose /*= DEFAULT_IS_VERBOSE*/,
++    bool is_scylla /*= DEFAULT_IS_SCYLLA*/, int smp /*= DEFAULT_SMP*/)
+     : cassandra_version_(server_version)
+     , dse_version_(DEFAULT_DSE_VERSION)
+     , use_git_(use_git)
+@@ -137,7 +138,9 @@ CCM::Bridge::Bridge(
+     , deployment_type_(DeploymentType::LOCAL)
+     , host_("127.0.0.1")
+ #endif
+-    , is_verbose_(is_verbose) {
++    , is_verbose_(is_verbose)
++    , is_scylla_(is_scylla)
++    , smp_(smp) {
+ #ifdef _WIN32
+ #ifdef _DEBUG
+   // Enable automatic execution of the memory leak detection upon exit
+@@ -154,6 +157,10 @@ CCM::Bridge::Bridge(
+   if (use_install_dir_ && install_dir_.empty()) {
+     throw BridgeException("Directory must not be blank");
+   }
++
++  if (!is_scylla_ && smp_ != DEFAULT_SMP) {
++    throw BridgeException("Parameter SMP (# of shards) is applicable to Scylla only");
++  }
+ #ifdef CASS_USE_LIBSSH2
+   // Determine if libssh2 needs to be initialized
+   if (deployment_type_ == DeploymentType::REMOTE) {
+@@ -301,7 +308,9 @@ bool CCM::Bridge::create_cluster(std::vector<unsigned short> data_center_nodes,
+     // Create the cluster create command and execute
+     std::vector<std::string> create_command;
+     create_command.push_back("create");
+-    create_command.push_back("--scylla");
++    if (is_scylla_) {
++      create_command.push_back("--scylla");
++    }
+     if (use_install_dir_ && !install_dir_.empty()) {
+       create_command.push_back("--install-dir=" + install_dir_);
+     } else {
+@@ -484,6 +493,12 @@ bool CCM::Bridge::start_cluster(
+     }
+   }
+ #endif
++  if (is_scylla_ && smp_ != DEFAULT_SMP) {
++    jvm_arguments.push_back("--smp");
++    std::ostringstream oss;
++    oss << smp_;
++    jvm_arguments.push_back(oss.str());
++  }
+   for (std::vector<std::string>::const_iterator iterator = jvm_arguments.begin();
+        iterator != jvm_arguments.end(); ++iterator) {
+     std::string jvm_argument = trim(*iterator);
+diff --git a/tests/src/integration/ccm/bridge.hpp b/tests/src/integration/ccm/bridge.hpp
+index 7b8257bb..1dbd9053 100644
+--- a/tests/src/integration/ccm/bridge.hpp
++++ b/tests/src/integration/ccm/bridge.hpp
+@@ -53,6 +53,8 @@ typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
+ #define DEFAULT_REMOTE_DEPLOYMENT_USERNAME "vagrant"
+ #define DEFAULT_REMOTE_DEPLOYMENT_PASSWORD "vagrant"
+ #define DEFAULT_IS_VERBOSE false
++#define DEFAULT_IS_SCYLLA true
++#define DEFAULT_SMP 1
+ #define DEFAULT_JVM_ARGUMENTS std::vector<std::string>()
+
+ // Define the node limit for a cluster
+@@ -197,7 +199,8 @@ public:
+          const std::string& username = DEFAULT_REMOTE_DEPLOYMENT_USERNAME,
+          const std::string& password = DEFAULT_REMOTE_DEPLOYMENT_PASSWORD,
+          const std::string& public_key = "", const std::string& private_key = "",
+-         bool is_verbose = DEFAULT_IS_VERBOSE);
++         bool is_verbose = DEFAULT_IS_VERBOSE, bool is_scylla = DEFAULT_IS_SCYLLA,
++         int smp = DEFAULT_SMP);
+
+   /**
+    * Destructor
+@@ -795,6 +798,14 @@ private:
+    * Flag to determine if verbose output is enabled
+    */
+   bool is_verbose_;
++  /**
++   * Flag to determine if `--scylla` is passed to `ccm create`
++   */
++  bool is_scylla_;
++  /**
++   * Number of shards per host, passed to `ccm start` as JVM args (applies to Scylla).
++   */
++  int smp_;
+
+ #ifdef CASS_USE_LIBSSH2
+   /**
+diff --git a/tests/src/integration/integration.cpp b/tests/src/integration/integration.cpp
+index 157be38a..ac397f64 100644
+--- a/tests/src/integration/integration.cpp
++++ b/tests/src/integration/integration.cpp
+@@ -156,7 +156,7 @@ void Integration::SetUp() {
+           Options::dse_credentials(), Options::dse_username(), Options::dse_password(),
+           Options::deployment_type(), Options::authentication_type(), Options::host(),
+           Options::port(), Options::username(), Options::password(), Options::public_key(),
+-          Options::private_key(), Options::is_verbose_ccm());
++          Options::private_key(), Options::is_verbose_ccm(), Options::is_scylla(), Options::smp());
+       if (ccm_->create_cluster(data_center_nodes, is_with_vnodes_, is_password_authenticator_,
+                                is_ssl_, is_client_authentication_)) {
+         if (is_ccm_start_requested_) {
+diff --git a/tests/src/integration/options.cpp b/tests/src/integration/options.cpp
+index 35c46585..db637da7 100644
+--- a/tests/src/integration/options.cpp
++++ b/tests/src/integration/options.cpp
+@@ -22,6 +22,7 @@
+
+ #include <algorithm>
+ #include <iostream>
++#include <sstream>
+
+ #define DEFAULT_OPTIONS_CASSSANDRA_VERSION CCM::CassVersion("3.11.6")
+ #define DEFAULT_OPTIONS_DSE_VERSION CCM::DseVersion("6.7.7")
+@@ -49,6 +50,8 @@ std::string Options::private_key_ = "private.key";
+ bool Options::is_verbose_ccm_ = false;
+ bool Options::is_verbose_integration_ = false;
+ bool Options::is_beta_protocol_ = true;
++bool Options::is_scylla_ = true;
++int Options::smp_ = 1;
+
+ // Static initialization is not guaranteed for the following types
+ CCM::DseCredentialsType Options::dse_credentials_type_;
+@@ -166,6 +169,26 @@ bool Options::initialize(int argc, char* argv[]) {
+         } else {
+           std::cerr << "Missing Category: All applicable tests will run" << std::endl;
+         }
++      } else if (key == "--scylla") {
++        if (!value.empty()) {
++          is_scylla_ = bool_value(value);
++        } else {
++          // Just specifying the option is enough, as in scylla-ccm.
++          is_scylla_ = true;
++        }
++      } else if (key == "--smp") {
++        if (!value.empty()) {
++          std::istringstream iss(value);
++          int smp;
++          iss >> smp;
++          if (iss) {
++            smp_ = smp;
++          } else {
++            std::cerr << "Invalid value for `--smp`: " << value << ". Using default " << smp_ << std::endl;
++          }
++        } else {
++          std::cerr << "No value provided for `--smp`. Using default " << smp_ << std::endl;
++        }
+       } else if (key == "--verbose") {
+         if (!value.empty() && !bool_value(value)) {
+           std::vector<std::string> components = test::Utils::explode(value, ',');
+@@ -515,7 +538,8 @@ SharedPtr<CCM::Bridge, StdDeleter<CCM::Bridge> > Options::ccm() {
+                          Options::dse_password(), Options::deployment_type(),
+                          Options::authentication_type(), Options::host(), Options::port(),
+                          Options::username(), Options::password(), Options::public_key(),
+-                         Options::private_key(), Options::is_verbose_ccm());
++                         Options::private_key(), Options::is_verbose_ccm(),
++                         Options::is_scylla(), Options::smp());
+ }
+
+ bool Options::is_verbose_ccm() { return is_verbose_ccm_; }
+@@ -524,6 +548,10 @@ bool Options::is_verbose_integration() { return is_verbose_integration_; }
+
+ bool Options::is_beta_protocol() { return is_beta_protocol_; }
+
++bool Options::is_scylla() { return is_scylla_; }
++
++int Options::smp() { return smp_; }
++
+ Options::Options() {}
+
+ bool Options::bool_value(const std::string& value) {
+diff --git a/tests/src/integration/options.hpp b/tests/src/integration/options.hpp
+index e9ca7f70..255bb676 100644
+--- a/tests/src/integration/options.hpp
++++ b/tests/src/integration/options.hpp
+@@ -233,6 +233,14 @@ public:
+    * @return True if beta protocol should be enabled; false otherwise
+    */
+   static bool is_beta_protocol();
++  /**
++   * Flag to determine whether `--scylla` option should be passed to `ccm create`.
++   */
++  static bool is_scylla();
++  /**
++   * Requested number of shards per host, passed through JVM args in `ccm start`. Applies to Scylla.
++   */
++  static int smp();
+   /**
+    * Get a CCM instance based on the options
+    *
+@@ -357,6 +365,14 @@ private:
+    * NOTE: Individual tests can still override this.
+    */
+   static bool is_beta_protocol_;
++  /**
++   * Flag that passes `--scylla` to `ccm create` (or not). By default ON.
++   */
++  static bool is_scylla_;
++  /**
++   * Number of shards per host (applies to Scylla). By default 1.
++   */
++  static int smp_;
+
+   /**
+    * Hidden default constructor
+--
+2.14.3
 diff --git a/src/random.cpp b/src/random.cpp
 index ccc6b223..23597cb3 100644
 --- a/src/random.cpp
