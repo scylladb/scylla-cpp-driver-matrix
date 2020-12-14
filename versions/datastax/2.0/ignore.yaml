@@ -11,6 +11,8 @@ tests:
   - DcAwarePolicyTest.Integration_Cassandra_UsedHostsRemoteDc
   - ExecutionProfileTest.Integration_Cassandra_RequestTimeout
   - ExecutionProfileTest.Integration_Cassandra_SpeculativeExecutionPolicy
+  # Ignore next test due to issue https://github.com/scylladb/scylla/issues/7786
+  - HeartbeatTests.Integration_Cassandra_HeartbeatFailed
   - MetricsTests.Integration_Cassandra_SpeculativeExecutionRequests
   - MetricsTests.Integration_Cassandra_StatsConnections
   - PreparedTests.Integration_Cassandra_PreparedIDUnchangedDuringReprepare
