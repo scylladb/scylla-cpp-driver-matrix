@@ -74,7 +74,7 @@ class Run:
     def _testsList(self):
         ignore_tests = []
         with open(self._testsFile()) as f:
-            content = yaml.load(f)
+            content = yaml.safe_load(f)
             if 'tests' in content:
                 ignore_tests.extend(content['tests'])
         return ignore_tests
