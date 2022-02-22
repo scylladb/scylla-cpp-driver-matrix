@@ -141,6 +141,7 @@ docker_cmd="docker run --detach \
     -v ${CPP_DRIVER_ORIG_DIR}:${CPP_DRIVER_DIR} \
     -v ${CCM_DIR}:${CCM_DIR} \
     -e HOME \
+    -e PYTHONUNBUFFERED=1 \
     -e SCYLLA_EXT_OPTS \
     -e LC_ALL=en_US.UTF-8 \
     ${BUILD_OPTIONS} \
