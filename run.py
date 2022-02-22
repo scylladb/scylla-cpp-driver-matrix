@@ -111,15 +111,13 @@ class Run:
 
     def compile_tests(self):
         logging.info('Compiling...')
-        os.chdir(os.path.join(self._cpp_driver_git, 'build'))
         cmd = "cmake -DCASS_BUILD_INTEGRATION_TESTS=ON -S .. -B . && make"
-        subprocess.check_call(cmd, shell=True)
-        os.chdir(self._cpp_driver_git)
+        subprocess.check_call(cmd, shell=True, cwd=os.path.join(self._cpp_driver_git, 'build'))
 
     def _checkout_tag(self):
         try:
-            subprocess.check_call('git checkout .', shell=True)
-            subprocess.check_call('git checkout {}'.format(self._driver_version), shell=True)
+            self._run_command_in_shell('git checkout .')
+            self._run_command_in_shell('git checkout {}'.format(self._driver_version))
             return True
         except Exception as exc:
             # TODO: we have no branches (version) yes. return False and change the message when

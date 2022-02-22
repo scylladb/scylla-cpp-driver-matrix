@@ -1,15 +1,19 @@
 import os
+import sys
 import logging
 import argparse
 import run
 import subprocess
+import traceback
 from typing import List
+
+from email_sender import send_mail, create_report, get_driver_origin_remote
 
 logging.basicConfig(level=logging.INFO)
 
 
 def main(cpp_driver_dir: str, scylla_install_dir: str, driver_type: str, versions: str, scylla_version: str,
-         summary_file: str, cql_cassandra_version: str):
+         summary_file: str, cql_cassandra_version: str, recipients: list):
     results = {}
     status = 0
     for version in versions:
@@ -25,19 +29,31 @@ def main(cpp_driver_dir: str, scylla_install_dir: str, driver_type: str, version
         except Exception:
             logging.exception(f"{version} failed")
             status = 1
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            results[version] = dict(exception=traceback.format_exception(exc_type, exc_value, exc_traceback))
+
     logging.info(f'=== {driver_type.upper()} CPP DRIVER MATRIX RESULTS ===')
     for version, result in results.items():
+        if isinstance(result, dict):
+            continue
         failed_tests = "Failed tests:\n\t%s\n" % '\n\t'.join(result.failed_tests) if result.failed else ''
         summary = '\nRunning tests: %d\nRan tests: %d\nPassed: %d\nFailed: %d\n%s' \
                   'Returned code: %d\n\n' % (result.running_tests, result.ran_tests, result.passed, result.failed,
                                              failed_tests, result.returncode)
 
         logging.info(summary)
-        write_summary_to_file(summary_file=summary_file, title=f"{driver_type.upper()} CPP DRIVER VERSION {version}",
-                              summary=summary)
+        if summary_file:
+            write_summary_to_file(summary_file=summary_file, title=f"{driver_type.upper()} CPP DRIVER VERSION {version}",
+                                  summary=summary)
         if result.failed > 0 or result.returncode > 0 or result.ran_tests == 0 \
                 or result.failed + result.passed != result.ran_tests:
             status = 1
+
+    if recipients:
+        email_report = create_report(results=results)
+        email_report['driver_remote'] = get_driver_origin_remote(cpp_driver_dir)
+        email_report['status'] = "SUCCESS" if status == 0 else "FAILED"
+        send_mail(recipients, email_report)
 
     quit(status)
 
@@ -99,6 +115,7 @@ if __name__ == '__main__':
                                                'For example, the user selects the 2 latest versions for version 4.'
                                                'The values to be returned are: 4.9.0-1 and 4.8.0-1',
                         type=int, default=None, nargs='?')
+    parser.add_argument('--recipients', help="whom to send mail at the end of the run",  nargs='+', default=None)
 
     arguments = parser.parse_args()
     if not isinstance(arguments.versions, list):
@@ -114,4 +131,5 @@ if __name__ == '__main__':
          versions=versions,
          scylla_version=arguments.scylla_version,
          summary_file=arguments.summary_file,
-         cql_cassandra_version=arguments.cql_cassandra_version)
+         cql_cassandra_version=arguments.cql_cassandra_version,
+         recipients=arguments.recipients)

@@ -75,6 +75,13 @@ if [[ -f ${RESULTS_SUMMARY_FILE} ]]; then
     rm -f ${RESULTS_SUMMARY_FILE}
 fi
 
+# export all BUILD_* env vars into the docker run
+BUILD_OPTIONS=$(env | sed -n 's/^\(BUILD_[^=]\+\)=.*/--env \1/p')
+# export all JOB_* env vars into the docker run
+JOB_OPTIONS=$(env | sed -n 's/^\(JOB_[^=]\+\)=.*/--env \1/p')
+# export all AWS_* env vars into the docker run
+AWS_OPTIONS=$(env | sed -n 's/^\(AWS_[^=]\+\)=.*/--env \1/p')
+
 # if in jenkins also mount the workspace into docker
 if [[ -d ${WORKSPACE} ]]; then
 WORKSPACE_MNT="-v ${WORKSPACE}:${WORKSPACE}"
@@ -127,6 +134,7 @@ else
 fi
 
 docker_cmd="docker run --detach \
+    -e WORKSPACE \
     ${WORKSPACE_MNT} \
     ${DOCKER_COMMAND_PARAMS} \
     -v ${CPP_MATRIX_DIR}:${CPP_MATRIX_DIR} \
@@ -135,8 +143,9 @@ docker_cmd="docker run --detach \
     -e HOME \
     -e SCYLLA_EXT_OPTS \
     -e LC_ALL=en_US.UTF-8 \
-    -e NODE_TOTAL \
-    -e NODE_INDEX \
+    ${BUILD_OPTIONS} \
+    ${JOB_OPTIONS} \
+    ${AWS_OPTIONS} \
     -w ${CPP_MATRIX_DIR} \
     -v /etc/passwd:/etc/passwd:ro \
     -v /etc/group:/etc/group:ro \

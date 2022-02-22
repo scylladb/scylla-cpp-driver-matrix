@@ -1,5 +1,6 @@
 PyYAML==5.1.1
 packaging==19.0
+jinja2==3.0.3
 boto3==1.21.4
 botocore==1.24.4
 packaging==19.0
