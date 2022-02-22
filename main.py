@@ -1,6 +1,9 @@
+import os
 import logging
 import argparse
 import run
+import subprocess
+from typing import List
 
 logging.basicConfig(level=logging.INFO)
 
@@ -8,18 +11,21 @@ logging.basicConfig(level=logging.INFO)
 def main(cpp_driver_dir: str, scylla_install_dir: str, driver_type: str, versions: str, scylla_version: str,
          summary_file: str, cql_cassandra_version: str):
     results = {}
+    status = 0
     for version in versions:
         logging.info(f'=== {driver_type.upper()} CPP DRIVER VERSION {version} ===')
-        test_run = run.Run(cpp_driver_git=cpp_driver_dir,
-                           scylla_install_dir=scylla_install_dir,
-                           driver_type=driver_type,
-                           driver_version=version,
-                           scylla_version=scylla_version,
-                           cql_cassandra_version=cql_cassandra_version)
-        results[version] = test_run.run()
-
+        try:
+            test_run = run.Run(cpp_driver_git=cpp_driver_dir,
+                               scylla_install_dir=scylla_install_dir,
+                               driver_type=driver_type,
+                               driver_version=version,
+                               scylla_version=scylla_version,
+                               cql_cassandra_version=cql_cassandra_version)
+            results[version] = test_run.run()
+        except Exception:
+            logging.exception(f"{version} failed")
+            status = 1
     logging.info(f'=== {driver_type.upper()} CPP DRIVER MATRIX RESULTS ===')
-    status = 0
     for version, result in results.items():
         failed_tests = "Failed tests:\n\t%s\n" % '\n\t'.join(result.failed_tests) if result.failed else ''
         summary = '\nRunning tests: %d\nRan tests: %d\nPassed: %d\nFailed: %d\n%s' \
@@ -35,6 +41,7 @@ def main(cpp_driver_dir: str, scylla_install_dir: str, driver_type: str, version
 
     quit(status)
 
+
 # Save summary of all test results in the one file
 def write_summary_to_file(summary_file, title, summary):
     with open(summary_file, 'a') as f:
@@ -42,8 +49,36 @@ def write_summary_to_file(summary_file, title, summary):
         f.writelines(summary)
 
 
+def extract_n_latest_repo_tags(repo_directory: str, major_versions: List[str], latest_tags_size: int = 2,
+                               is_scylla_driver: bool = True) -> List[str]:
+    major_versions = sorted(major_versions, key=lambda major_ver: float(major_ver))
+    filter_version = f"| grep {'' if is_scylla_driver else '-v '} '\\-1'"
+    commands = [f"cd {repo_directory}", "git checkout .", ]
+    if not os.environ.get("DEV_MODE", False):
+        commands.append("git fetch -p --all")
+    commands.append(f"git tag --sort=-creatordate {filter_version}")
+
+    selected_tags = {}
+    ignore_tags = set()
+    result = []
+    lines = subprocess.check_output("\n".join(commands), shell=True).decode().splitlines()
+    for repo_tag in lines:
+        if "." in repo_tag:
+            version = tuple(repo_tag.split(".", maxsplit=2)[:2])
+            if version not in ignore_tags:
+                ignore_tags.add(version)
+                selected_tags.setdefault(repo_tag[0], []).append(repo_tag)
+
+    for major_version in major_versions:
+        if len(selected_tags[major_version]) < latest_tags_size:
+            raise ValueError(f"There are no '{latest_tags_size}' different versions that start with the major version"
+                             f" '{major_version}'")
+        result.extend(selected_tags[major_version][:latest_tags_size])
+    return result
+
+
 if __name__ == '__main__':
-    versions = ['master']
+    versions = ['2.15.0', '2.16.0']
     parser = argparse.ArgumentParser()
     parser.add_argument('cpp_driver_dir', help='folder with git repository of cpp-driver')
     parser.add_argument('scylla_install_dir',
@@ -59,10 +94,20 @@ if __name__ == '__main__':
                         default=None, dest='summary_file')
     parser.add_argument('--cql-cassandra-version', help="CQL Cassandra version",
                         default=None, dest='cql_cassandra_version')
+    parser.add_argument('--version-size', help='The number of the latest versions that will test.'
+                                               'The version is filtered by the major and minor values.'
+                                               'For example, the user selects the 2 latest versions for version 4.'
+                                               'The values to be returned are: 4.9.0-1 and 4.8.0-1',
+                        type=int, default=None, nargs='?')
+
     arguments = parser.parse_args()
     if not isinstance(arguments.versions, list):
         versions = arguments.versions.split(',')
 
+    if arguments.version_size:
+        versions = extract_n_latest_repo_tags(arguments.cpp_driver_dir, list({v.split('.')[0] for v in versions}),
+                                              latest_tags_size=arguments.version_size,
+                                              is_scylla_driver=arguments.driver_type == "scylla")
     main(cpp_driver_dir=arguments.cpp_driver_dir,
          scylla_install_dir=arguments.scylla_install_dir,
          driver_type=arguments.driver_type,

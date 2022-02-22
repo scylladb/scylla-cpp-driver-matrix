@@ -54,19 +54,20 @@ class Run:
 
         tags_defined = []
         for tag in os.listdir(target_version_folder):
+            version_tag = None
             try:
-                tag = Version(tag)
+                version_tag = Version(tag)
             except:
                 continue
-            if tag:
-                tags_defined.append(tag)
+            if version_tag:
+                tags_defined.append((tag, version_tag))
         if not tags_defined:
             return None
-        last_valid_defined_tag = Version('0.0.0')
-        for tag in sorted(tags_defined):
-            if tag <= target_version:
+        last_valid_defined_tag = str(Version('0.0.0'))
+        for tag, version_tag in sorted(tags_defined):
+            if version_tag <= target_version:
                 last_valid_defined_tag = tag
-        return os.path.join(target_version_folder, str(last_valid_defined_tag))
+        return os.path.join(target_version_folder, last_valid_defined_tag)
 
     def _testsFile(self):
         here = os.path.dirname(__file__)
