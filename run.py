@@ -3,6 +3,7 @@ import os
 import yaml
 import logging
 import subprocess
+from pathlib import Path
 from packaging.version import Version
 
 from typing import NamedTuple
@@ -37,7 +38,7 @@ class Run:
     def version_folder(self):
         if self._version_folder is not None:
             return self._version_folder
-        self._version_folder = self.__version_folder(self.driver_type, self._driver_version)
+        self._version_folder = Path(self.__version_folder(self.driver_type, self._driver_version))
         return self._version_folder
 
     @staticmethod
@@ -79,55 +80,51 @@ class Run:
                 ignore_tests.extend(content['tests'])
         return ignore_tests
 
-    def _apply_patch(self):
-        output = None
-        try:
-            patch_file = os.path.join(self.version_folder, 'patch')
+    def _run_command_in_shell(self, cmd: str):
+        logging.info("Execute the cmd '%s'", cmd)
+        with subprocess.Popen(cmd, shell=True, executable="/bin/bash",
+                              cwd=self._cpp_driver_git, stderr=subprocess.PIPE, text=True) as proc:
+            _, stderr = proc.communicate()
+            status_code = proc.returncode
+        assert status_code == 0, stderr
 
-            if not os.path.exists(patch_file):
-                logging.info('Cannot find patch for version {}'.format(self._driver_version))
-                self.run_compile_after_patch = False
-                return True
-
-            if os.path.getsize(patch_file) == 0:
-                logging.info('Patch file is empty. Skip applying')
-                self.run_compile_after_patch = False
-                return True
-
-            logging.info('Applying patch...')
-            command = "patch -p1 -i {}".format(patch_file)
-            output = subprocess.run(command, shell=True, capture_output=True)
-            self.run_compile_after_patch = True
-            return True
-        except Exception as exc:
-            if isinstance(output, subprocess.CompletedProcess):
-                if 'Reversed (or previously applied) patch detected' in output.stdout:
-                    self.run_compile_after_patch = True
+    def _apply_patch_files(self) -> bool:
+        is_dir_empty = True
+        for file_path in self.version_folder.iterdir():
+            is_dir_empty = False
+            if file_path.name.startswith("patch"):
+                try:
+                    logging.info("Show patch's statistics for file '%s'", file_path)
+                    self._run_command_in_shell(f"git apply --stat {file_path}")
+                    logging.info("Detect patch's errors for file '%s'", file_path)
+                    self._run_command_in_shell(f"git apply -v --check {file_path}")
+                    logging.info("Applying patch file '%s'", file_path)
+                    self._run_command_in_shell(f"patch -p1 -i {file_path}")
                     return True
-
-            logging.error("Failed to apply patch to version %s, with: %s" % (self._driver_version, str(exc)))
-            return False
+                except Exception as exc:
+                    logging.error("Failed to apply patch '%s' to version '%s', with: '%s'",
+                                  file_path, self._driver_version, str(exc))
+                    raise
+        if is_dir_empty:
+            logging.warning("The '%s' directory does not contain any files", self.version_folder)
 
     def compile_tests(self):
         logging.info('Compiling...')
         os.chdir(os.path.join(self._cpp_driver_git, 'build'))
-        cmd = "cmake -DCASS_BUILD_INTEGRATION_TESTS=ON .. && make"
+        cmd = "cmake -DCASS_BUILD_INTEGRATION_TESTS=ON -S .. -B . && make"
         subprocess.check_call(cmd, shell=True)
         os.chdir(self._cpp_driver_git)
 
-    def _checkout_branch(self):
+    def _checkout_tag(self):
         try:
             subprocess.check_call('git checkout .', shell=True)
-            if self.driver_type == 'scylla':
-                subprocess.check_call('git checkout {}'.format(self._driver_version), shell=True)
-            else:
-                subprocess.check_call('git checkout {}-dse'.format(self._driver_version), shell=True)
+            subprocess.check_call('git checkout {}'.format(self._driver_version), shell=True)
             return True
         except Exception as exc:
             # TODO: we have no branches (version) yes. return False and change the message when
             #  the version will be created
             logging.error("Failed to branch for version %s, with: %s. Continue with 'master'" % (self._driver_version, str(exc)))
-            return True
+            return False
 
     def _publish_fake_result(self):
         return TestResults(running_tests=0, ran_tests=0, failed=0, passed=0, returncode=0, error='error',
@@ -136,11 +133,10 @@ class Run:
     def run(self) -> TestResults:
         os.chdir(self._cpp_driver_git)
 
-        # TODO: there is no official version. Test master version
-        # if not self._checkout_branch():
-        #     return self._publish_fake_result()
+        if not self._checkout_tag():
+             return self._publish_fake_result()
 
-        if not self._apply_patch():
+        if not self._apply_patch_files():
             return self._publish_fake_result()
 
         if self.run_compile_after_patch:

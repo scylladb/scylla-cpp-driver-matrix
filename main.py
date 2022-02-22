@@ -1,7 +1,3 @@
-from collections import defaultdict
-
-import os
-
 import logging
 import argparse
 import run
@@ -64,8 +60,6 @@ if __name__ == '__main__':
     parser.add_argument('--cql-cassandra-version', help="CQL Cassandra version",
                         default=None, dest='cql_cassandra_version')
     arguments = parser.parse_args()
-    if not isinstance(arguments.scylla_install_dir, list):
-        scylla_install_dir = arguments.scylla_install_dir.split(',')
     if not isinstance(arguments.versions, list):
         versions = arguments.versions.split(',')
 
