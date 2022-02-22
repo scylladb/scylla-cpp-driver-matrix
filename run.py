@@ -130,8 +130,6 @@ class Run:
                            failed_tests=[])
 
     def run(self) -> TestResults:
-        os.chdir(self._cpp_driver_git)
-
         if not self._checkout_tag():
              return self._publish_fake_result()
 
@@ -151,18 +149,23 @@ class Run:
         use_install_dir = f"--install-dir={self._scylla_install_dir}" if not self._scylla_version else ""
         smp = " --smp=2" if self.driver_type == "scylla" else ""
 
-        cmd = f'{self._cpp_driver_git}/build/cassandra-integration-tests {use_install_dir} ' \
+        cmd = f'./cassandra-integration-tests {use_install_dir} ' \
               f'--version={self._cql_cassandra_version}{smp} --category={self.category} --verbose=ccm ' \
               f'--gtest_filter={gtest_filter} ' \
               f'--gtest_output=xml:{self._cpp_driver_git}/log/TEST-{self.driver_type}-{self._driver_version}.xml'
         logging.info(cmd)
-        result = subprocess.run(cmd, shell=True, capture_output=True)
+        stdout = ''
+        stderr = ''
+        with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              cwd=f'{self._cpp_driver_git}/build', text=True, bufsize=1, universal_newlines=True) as process:
+            for line in process.stdout:
+                print(line, end='')
+                stdout += line
+            for line in process.stderr:
+                print(line, end='')
+                stderr += line
 
-        # Print command output in the log
-        logging.info(result.stdout.decode())
-        logging.info(result.stderr.decode())
-
-        return self.analyze_results(result.stdout.decode(), result.stderr.decode(), result.returncode)
+        return self.analyze_results(stdout, stderr, process.returncode)
 
     def analyze_results(self, stdout: str, stderr: str, returncode: int) -> TestResults:
         running_tests = passed_tests = failed_tests = ran_tests = 0
