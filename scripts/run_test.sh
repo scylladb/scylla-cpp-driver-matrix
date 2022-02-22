@@ -146,13 +146,9 @@ docker_cmd="docker run --detach \
     -v ${HOME}/.local:${HOME}/.local \
     -v ${HOME}/.ccm:${HOME}/.ccm \
     --network=bridge --privileged \
-    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'sudo yum install -y cmake libuv-devel openssl-devel krb5-devel patch;
-          cd ${CPP_DRIVER_ORIG_DIR};mkdir -p build && cd build && cmake -DCASS_BUILD_INTEGRATION_TESTS=ON .. && make;
-          pip3 install --force-reinstall --user -e ${CCM_DIR} ;
+    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'mkdir -p ${CPP_DRIVER_ORIG_DIR}/build ;
+          pip3 install --force-reinstall --user -e ${CCM_DIR} ; export PATH=\$PATH:\${HOME}/.local/bin ;
           echo SCYLLA_VERSION is \$SCYLLA_VERSION;
-          export PATH=\$PATH:\${HOME}/.local/bin:${CPP_DRIVER_DIR}/build/cassandra-integration-tests:/usr/bin/patch ;
-          echo \$PATH;
-          cd ${CPP_MATRIX_DIR};
           $*'"
 
 echo "Running Docker: $docker_cmd"
