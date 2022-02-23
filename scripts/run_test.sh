@@ -30,11 +30,16 @@ $(basename $0) - Run cpp-driver integration tests over scylla using docker
     ./run_test.sh python3 main.py params
 "
 
-CPP_DRIVER_ORIG_DIR=$3
-# CPP driver folder (scylla or datastax
-echo "CPP_DRIVER_ORIG_DIR: ${CPP_DRIVER_ORIG_DIR}"
+CPP_DRIVER_DIR_FROM_ARGS=`realpath $3`
+# CPP driver folder (scylla or datastax)
+echo "CPP_DRIVER_DIR_FROM_ARGS: ${CPP_DRIVER_DIR_FROM_ARGS}"
 export CPP_MATRIX_DIR=${CPP_MATRIX_DIR:-`pwd`}
 export CPP_DRIVER_DIR=${CPP_DRIVER_DIR:-`pwd`/../cpp-driver}
+export CPP_DRIVER_DIR=$(realpath $CPP_DRIVER_DIR)
+if [[ "$CPP_DRIVER_DIR" != "CPP_DRIVER_DIR_FROM_ARGS" ]]; then
+  export CPP_DRIVER_DIR=$CPP_DRIVER_DIR_FROM_ARGS
+fi
+
 export CASSANDRA_DIR=${CASSANDRA_DIR:-`pwd`/../scylla}
 SCYLLA_ROOT_DIR=$(echo $CASSANDRA_DIR | sed 's|/build/.*||')
 
@@ -133,7 +138,7 @@ docker_cmd="docker run --detach \
     ${WORKSPACE_MNT} \
     ${DOCKER_COMMAND_PARAMS} \
     -v ${CPP_MATRIX_DIR}:${CPP_MATRIX_DIR} \
-    -v ${CPP_DRIVER_ORIG_DIR}:${CPP_DRIVER_DIR} \
+    -v ${CPP_DRIVER_DIR}:${CPP_DRIVER_DIR} \
     -v ${CCM_DIR}:${CCM_DIR} \
     -e HOME \
     -e PYTHONUNBUFFERED=1 \
@@ -151,7 +156,7 @@ docker_cmd="docker run --detach \
     -v ${HOME}/.local:${HOME}/.local \
     -v ${HOME}/.ccm:${HOME}/.ccm \
     --network=bridge --privileged \
-    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'mkdir -p ${CPP_DRIVER_ORIG_DIR}/build ;
+    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'mkdir -p ${CPP_DRIVER_DIR}/build ;
           pip3 install --force-reinstall --user -e ${CCM_DIR} ; export PATH=\$PATH:\${HOME}/.local/bin ;
           echo SCYLLA_VERSION is \$SCYLLA_VERSION;
           $*'"
