@@ -31,7 +31,6 @@ $(basename $0) - Run cpp-driver integration tests over scylla using docker
 "
 
 CPP_DRIVER_ORIG_DIR=$3
-RESULTS_SUMMARY_FILE=$8
 # CPP driver folder (scylla or datastax
 echo "CPP_DRIVER_ORIG_DIR: ${CPP_DRIVER_ORIG_DIR}"
 export CPP_MATRIX_DIR=${CPP_MATRIX_DIR:-`pwd`}
@@ -69,10 +68,6 @@ if [[ ! -d ${HOME}/.ccm ]]; then
 fi
 if [[ ! -d ${HOME}/.local ]]; then
     mkdir -p ${HOME}/.local/lib
-fi
-
-if [[ -f ${RESULTS_SUMMARY_FILE} ]]; then
-    rm -f ${RESULTS_SUMMARY_FILE}
 fi
 
 # export all BUILD_* env vars into the docker run
