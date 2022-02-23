@@ -30,6 +30,9 @@ $(basename $0) - Run cpp-driver integration tests over scylla using docker
     ./run_test.sh python3 main.py params
 "
 
+here="$(realpath $(dirname "$0"))"
+DOCKER_IMAGE="$(<"$here/image")"
+
 CPP_DRIVER_DIR_FROM_ARGS=`realpath $3`
 # CPP driver folder (scylla or datastax)
 echo "CPP_DRIVER_DIR_FROM_ARGS: ${CPP_DRIVER_DIR_FROM_ARGS}"
@@ -121,18 +124,6 @@ else
     "
 fi
 
-export CPP_DRIVER_DOCKER_SCRIPTS_DIR=${CPP_DRIVER_DOCKER_SCRIPTS_DIR:-`pwd`/scripts}
-export CPP_DRIVER_DOCKER_TAG="cpp-driver-env"
-docker_build_cmd="docker build -t ${CPP_DRIVER_DOCKER_TAG} ${CPP_DRIVER_DOCKER_SCRIPTS_DIR}"
-echo "Build Docker from Dockerfile: $docker_build_cmd"
-$docker_build_cmd
-if [ $? -eq 0 ]; then
-   echo OK
-else
-   echo "Build Docker from Dockerfile failed"
-   exit 1
-fi
-
 docker_cmd="docker run --detach \
     -e WORKSPACE \
     ${WORKSPACE_MNT} \
@@ -156,7 +147,7 @@ docker_cmd="docker run --detach \
     -v ${HOME}/.local:${HOME}/.local \
     -v ${HOME}/.ccm:${HOME}/.ccm \
     --network=bridge --privileged \
-    --entrypoint bash ${CPP_DRIVER_DOCKER_TAG} -c 'mkdir -p ${CPP_DRIVER_DIR}/build ;
+    --entrypoint bash ${DOCKER_IMAGE}  -c 'mkdir -p ${CPP_DRIVER_DIR}/build ;
           pip3 install --force-reinstall --user -e ${CCM_DIR} ; export PATH=\$PATH:\${HOME}/.local/bin ;
           echo SCYLLA_VERSION is \$SCYLLA_VERSION;
           $*'"
