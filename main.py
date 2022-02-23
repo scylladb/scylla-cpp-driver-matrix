@@ -16,6 +16,7 @@ def main(cpp_driver_dir: str, scylla_install_dir: str, driver_type: str, version
          summary_file: str, cql_cassandra_version: str, recipients: list):
     results = {}
     status = 0
+
     for version in versions:
         logging.info(f'=== {driver_type.upper()} CPP DRIVER VERSION {version} ===')
         try:
