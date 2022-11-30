@@ -115,13 +115,11 @@ if [[ -z ${SCYLLA_VERSION} ]]; then
     -e CASSANDRA_DIR
     "
 else
+    # export all AWS_* env vars into the docker run
+    SCYLLA_OPTIONS=$(env | sed -n 's/^\(SCYLLA_[^=]\+\)=.*/--env \1/p')
+
     # Use locally built scylla with relocatable package
-    DOCKER_COMMAND_PARAMS="
-    -e SCYLLA_VERSION \
-    -e SCYLLA_CORE_PACKAGE \
-    -e SCYLLA_JAVA_TOOLS_PACKAGE \
-    -e SCYLLA_JMX_PACKAGE
-    "
+    DOCKER_COMMAND_PARAMS="${SCYLLA_OPTIONS}"
 fi
 
 docker_cmd="docker run --detach \
