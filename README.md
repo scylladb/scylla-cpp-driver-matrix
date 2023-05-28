@@ -21,7 +21,7 @@ SCYLLA_VERSION=release:4.6.rc2  ./scripts/run_test.sh python3 main.py ../cpp-dri
 #### Uploading docker images
 When doing changes to `requirements.txt`, or any other change to docker image, it can be uploaded like this:
 ```bash
-    export MATRIX_DOCKER_IMAGE=scylladb/scylla-python-driver-matrix:ccp-fedora29-$(date +'%Y%m%d')
+    export MATRIX_DOCKER_IMAGE=scylladb/scylla-python-driver-matrix:ccp-bullseye-python3.11-$(date +'%Y%m%d')
     docker build ./scripts -t ${MATRIX_DOCKER_IMAGE}
     docker push ${MATRIX_DOCKER_IMAGE}
     echo "${MATRIX_DOCKER_IMAGE}" > scripts/image

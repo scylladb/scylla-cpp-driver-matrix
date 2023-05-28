@@ -1,7 +1,19 @@
-diff --git c/src/random.cpp w/src/random.cpp
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 06b84b75..e94fd3f2 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -71,6 +71,7 @@ endif()
+ 
+ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wconversion -Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-undefined-var-template -Werror")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-implicit-int-float-conversion -Wno-string-conversion")
+ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") # To many superfluous warnings generated with GCC when using -Wconversion (see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=40752)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+ endif()
+diff --git a/src/random.cpp b/src/random.cpp
 index ccc6b223..23597cb3 100644
---- c/src/random.cpp
-+++ w/src/random.cpp
+--- a/src/random.cpp
++++ b/src/random.cpp
 @@ -107,11 +107,6 @@ uint64_t get_random_seed(uint64_t seed) {
  #if defined(HAVE_GETRANDOM)
    num_bytes = static_cast<ssize_t>(syscall(SYS_getrandom, &seed, sizeof(seed), GRND_NONBLOCK));
@@ -14,10 +26,10 @@ index ccc6b223..23597cb3 100644
      readurandom = false;
    }
  #endif // defined(HAVE_GETRANDOM)
-diff --git c/tests/src/integration/ccm/bridge.cpp w/tests/src/integration/ccm/bridge.cpp
+diff --git a/tests/src/integration/ccm/bridge.cpp b/tests/src/integration/ccm/bridge.cpp
 index 9b03ce87..2582a640 100644
---- c/tests/src/integration/ccm/bridge.cpp
-+++ w/tests/src/integration/ccm/bridge.cpp
+--- a/tests/src/integration/ccm/bridge.cpp
++++ b/tests/src/integration/ccm/bridge.cpp
 @@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
@@ -141,10 +153,10 @@ index 9b03ce87..2582a640 100644
  
    return updateconf_command;
  }
-diff --git c/tests/src/integration/ccm/bridge.hpp w/tests/src/integration/ccm/bridge.hpp
+diff --git a/tests/src/integration/ccm/bridge.hpp b/tests/src/integration/ccm/bridge.hpp
 index 7b8257bb..1dbd9053 100644
---- c/tests/src/integration/ccm/bridge.hpp
-+++ w/tests/src/integration/ccm/bridge.hpp
+--- a/tests/src/integration/ccm/bridge.hpp
++++ b/tests/src/integration/ccm/bridge.hpp
 @@ -53,6 +53,8 @@ typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
  #define DEFAULT_REMOTE_DEPLOYMENT_USERNAME "vagrant"
  #define DEFAULT_REMOTE_DEPLOYMENT_PASSWORD "vagrant"
@@ -179,10 +191,10 @@ index 7b8257bb..1dbd9053 100644
  
  #ifdef CASS_USE_LIBSSH2
    /**
-diff --git c/tests/src/integration/integration.cpp w/tests/src/integration/integration.cpp
+diff --git a/tests/src/integration/integration.cpp b/tests/src/integration/integration.cpp
 index 157be38a..ac397f64 100644
---- c/tests/src/integration/integration.cpp
-+++ w/tests/src/integration/integration.cpp
+--- a/tests/src/integration/integration.cpp
++++ b/tests/src/integration/integration.cpp
 @@ -156,7 +156,7 @@ void Integration::SetUp() {
            Options::dse_credentials(), Options::dse_username(), Options::dse_password(),
            Options::deployment_type(), Options::authentication_type(), Options::host(),
@@ -192,10 +204,10 @@ index 157be38a..ac397f64 100644
        if (ccm_->create_cluster(data_center_nodes, is_with_vnodes_, is_password_authenticator_,
                                 is_ssl_, is_client_authentication_)) {
          if (is_ccm_start_requested_) {
-diff --git c/tests/src/integration/options.cpp w/tests/src/integration/options.cpp
+diff --git a/tests/src/integration/options.cpp b/tests/src/integration/options.cpp
 index 35c46585..db637da7 100644
---- c/tests/src/integration/options.cpp
-+++ w/tests/src/integration/options.cpp
+--- a/tests/src/integration/options.cpp
++++ b/tests/src/integration/options.cpp
 @@ -22,6 +22,7 @@
  
  #include <algorithm>
@@ -261,10 +273,10 @@ index 35c46585..db637da7 100644
  Options::Options() {}
  
  bool Options::bool_value(const std::string& value) {
-diff --git c/tests/src/integration/options.hpp w/tests/src/integration/options.hpp
+diff --git a/tests/src/integration/options.hpp b/tests/src/integration/options.hpp
 index e9ca7f70..255bb676 100644
---- c/tests/src/integration/options.hpp
-+++ w/tests/src/integration/options.hpp
+--- a/tests/src/integration/options.hpp
++++ b/tests/src/integration/options.hpp
 @@ -233,6 +233,14 @@ public:
     * @return True if beta protocol should be enabled; false otherwise
     */

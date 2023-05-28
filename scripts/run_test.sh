@@ -122,7 +122,7 @@ else
     DOCKER_COMMAND_PARAMS="${SCYLLA_OPTIONS}"
 fi
 
-docker_cmd="docker run --detach \
+docker_cmd="docker run --init --detach \
     -e WORKSPACE \
     ${WORKSPACE_MNT} \
     ${DOCKER_COMMAND_PARAMS} \
