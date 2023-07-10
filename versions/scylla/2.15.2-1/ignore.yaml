@@ -15,6 +15,7 @@ tests:
   - HeartbeatTests.Integration_Cassandra_HeartbeatFailed
   - MetricsTests.Integration_Cassandra_SpeculativeExecutionRequests
   - MetricsTests.Integration_Cassandra_StatsConnections
+  - MetricsTests.Integration_Cassandra_ErrorsConnectionTimeouts
   - PreparedTests.Integration_Cassandra_PreparedIDUnchangedDuringReprepare
   - ServerSideFailureTests.Integration_Cassandra_Warning
   - ServerSideFailureTests.Integration_Cassandra_ErrorFunctionFailure
