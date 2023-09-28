@@ -1,0 +1,29 @@
+# this is an example
+# put an ignore.yaml file in a version folder to use it
+#
+tests:
+  - AuthenticationTests*
+  - ConsistencyTwoNodeClusterTests.Integration_Cassandra_SimpleEachQuorum
+  - ControlConnectionTests.Integration_Cassandra_TopologyChange
+  - ControlConnectionTwoNodeClusterTests.Integration_Cassandra_Reconnection
+  - ControlConnectionTwoNodeClusterTests.Integration_Cassandra_StatusChange
+  - CustomPayloadTests*
+  - DbaasTests*
+  - DcAwarePolicyTest.Integration_Cassandra_UsedHostsRemoteDc
+  - ExecutionProfileTest.Integration_Cassandra_RequestTimeout
+  - ExecutionProfileTest.Integration_Cassandra_SpeculativeExecutionPolicy
+  # Ignore next test due to issue https://github.com/scylladb/scylla/issues/7786
+  - HeartbeatTests.Integration_Cassandra_HeartbeatFailed
+  - MetricsTests.Integration_Cassandra_SpeculativeExecutionRequests
+  - MetricsTests.Integration_Cassandra_StatsConnections
+  - MetricsTests.Integration_Cassandra_ErrorsConnectionTimeouts
+  - PreparedTests.Integration_Cassandra_PreparedIDUnchangedDuringReprepare
+  - ServerSideFailureTests.Integration_Cassandra_Warning
+  - ServerSideFailureTests.Integration_Cassandra_ErrorFunctionFailure
+  - ServerSideFailureTests.Integration_Cassandra_ErrorFunctionAlreadyExists
+  - SessionTest.Integration_Cassandra_ExternalHostListener
+  - SchemaMetadataTest*
+  - SchemaNullStringApiArgsTest*
+  - SpeculativeExecutionTests*
+  - SslTests*
+  - SslClientAuthenticationTests*
