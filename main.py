@@ -19,19 +19,21 @@ def main(cpp_driver_dir: str, scylla_install_dir: str, driver_type: str, version
 
     for version in versions:
         logging.info(f'=== {driver_type.upper()} CPP DRIVER VERSION {version} ===')
+        test_run = run.Run(cpp_driver_git=cpp_driver_dir,
+                            scylla_install_dir=scylla_install_dir,
+                            driver_type=driver_type,
+                            driver_version=version,
+                            scylla_version=scylla_version,
+                            cql_cassandra_version=cql_cassandra_version)
         try:
-            test_run = run.Run(cpp_driver_git=cpp_driver_dir,
-                               scylla_install_dir=scylla_install_dir,
-                               driver_type=driver_type,
-                               driver_version=version,
-                               scylla_version=scylla_version,
-                               cql_cassandra_version=cql_cassandra_version)
             results[version] = test_run.run()
         except Exception:
             logging.exception(f"{version} failed")
             status = 1
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            results[version] = dict(exception=traceback.format_exception(exc_type, exc_value, exc_traceback))
+            failure_reason = traceback.format_exception(exc_type, exc_value, exc_traceback)
+            results[version] = dict(exception=failure_reason)
+            test_run.create_metadata_for_failure(reason="\n".join(failure_reason))
 
     logging.info(f'=== {driver_type.upper()} CPP DRIVER MATRIX RESULTS ===')
     for version, result in results.items():
