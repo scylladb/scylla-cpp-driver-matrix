@@ -1,3 +1,4 @@
+import json
 import re
 import os
 import yaml
@@ -40,6 +41,10 @@ class Run:
             return self._version_folder
         self._version_folder = Path(self.__version_folder(self.driver_type, self._driver_version))
         return self._version_folder
+
+    @property
+    def metadata_file_name(self) -> str:
+        return f'metadata_{self.driver_type}-{self._driver_version}.json'
 
     @staticmethod
     def __version_folder(cpp_driver_type, target_tag):
@@ -129,6 +134,18 @@ class Run:
         return TestResults(running_tests=0, ran_tests=0, failed=0, passed=0, returncode=0, error='error',
                            failed_tests=[])
 
+    def create_metadata_for_failure(self, reason: str) -> None:
+        log_path = Path(f"{self._cpp_driver_git}/log")
+        metadata_file = log_path / self.metadata_file_name
+        if not log_path.exists():
+            log_path.mkdir(exist_ok=True)
+        metadata = {
+            "driver_name": f"TEST-{self.driver_type}-{self._driver_version}",
+            "driver_type": "cpp",
+            "failure_reason": reason,
+        }
+        metadata_file.write_text(json.dumps(metadata))
+
     def run(self) -> TestResults:
         if not self._checkout_tag():
              return self._publish_fake_result()
@@ -138,7 +155,12 @@ class Run:
 
         if self.run_compile_after_patch:
             self.compile_tests()
-
+        metadata_file = Path(f"{self._cpp_driver_git}/log") / self.metadata_file_name
+        metadata = {
+            "driver_name": f"TEST-{self.driver_type}-{self._driver_version}",
+            "driver_type": "cpp",
+            "junit_result": f"./TEST-{self.driver_type}-{self._driver_version}.xml",
+        }
         # To filter out the test add "minus" before the list of ignored tests
         # gtest_filter = "BasicsTests*"
         gtest_filter = f"-{':'.join(self._testsList())}" if self._testsList() else '*'
@@ -164,7 +186,7 @@ class Run:
             for line in process.stderr:
                 print(line, end='')
                 stderr += line
-
+        metadata_file.write_text(json.dumps(metadata))
         return self.analyze_results(stdout, stderr, process.returncode)
 
     def analyze_results(self, stdout: str, stderr: str, returncode: int) -> TestResults:
