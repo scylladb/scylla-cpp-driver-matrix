@@ -1,7 +1,7 @@
-diff --git c/src/random.cpp w/src/random.cpp
+diff --git a/src/random.cpp b/src/random.cpp
 index ccc6b223..23597cb3 100644
---- c/src/random.cpp
-+++ w/src/random.cpp
+--- a/src/random.cpp
++++ b/src/random.cpp
 @@ -107,11 +107,6 @@ uint64_t get_random_seed(uint64_t seed) {
  #if defined(HAVE_GETRANDOM)
    num_bytes = static_cast<ssize_t>(syscall(SYS_getrandom, &seed, sizeof(seed), GRND_NONBLOCK));
@@ -14,10 +14,10 @@ index ccc6b223..23597cb3 100644
      readurandom = false;
    }
  #endif // defined(HAVE_GETRANDOM)
-diff --git c/tests/src/integration/ccm/bridge.cpp w/tests/src/integration/ccm/bridge.cpp
+diff --git a/tests/src/integration/ccm/bridge.cpp b/tests/src/integration/ccm/bridge.cpp
 index 9b03ce87..2582a640 100644
---- c/tests/src/integration/ccm/bridge.cpp
-+++ w/tests/src/integration/ccm/bridge.cpp
+--- a/tests/src/integration/ccm/bridge.cpp
++++ b/tests/src/integration/ccm/bridge.cpp
 @@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
@@ -141,10 +141,10 @@ index 9b03ce87..2582a640 100644
  
    return updateconf_command;
  }
-diff --git c/tests/src/integration/ccm/bridge.hpp w/tests/src/integration/ccm/bridge.hpp
+diff --git a/tests/src/integration/ccm/bridge.hpp b/tests/src/integration/ccm/bridge.hpp
 index 7b8257bb..1dbd9053 100644
---- c/tests/src/integration/ccm/bridge.hpp
-+++ w/tests/src/integration/ccm/bridge.hpp
+--- a/tests/src/integration/ccm/bridge.hpp
++++ b/tests/src/integration/ccm/bridge.hpp
 @@ -53,6 +53,8 @@ typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
  #define DEFAULT_REMOTE_DEPLOYMENT_USERNAME "vagrant"
  #define DEFAULT_REMOTE_DEPLOYMENT_PASSWORD "vagrant"
@@ -179,11 +179,19 @@ index 7b8257bb..1dbd9053 100644
  
  #ifdef CASS_USE_LIBSSH2
    /**
-diff --git c/tests/src/integration/integration.cpp w/tests/src/integration/integration.cpp
-index 157be38a..ac397f64 100644
---- c/tests/src/integration/integration.cpp
-+++ w/tests/src/integration/integration.cpp
-@@ -156,7 +156,7 @@ void Integration::SetUp() {
+diff --git a/tests/src/integration/integration.cpp b/tests/src/integration/integration.cpp
+index 157be38a..169dc032 100644
+--- a/tests/src/integration/integration.cpp
++++ b/tests/src/integration/integration.cpp
+@@ -66,6 +66,7 @@ Integration::Integration()
+     , is_keyspace_change_requested_(true)
+     , is_test_chaotic_(false)
+     , is_beta_protocol_(Options::is_beta_protocol())
++    , disable_tablets_(false)
+     , protocol_version_(CASS_PROTOCOL_VERSION_V4)
+     , create_keyspace_query_("")
+     , start_time_(0ull) {
+@@ -156,7 +157,7 @@ void Integration::SetUp() {
            Options::dse_credentials(), Options::dse_username(), Options::dse_password(),
            Options::deployment_type(), Options::authentication_type(), Options::host(),
            Options::port(), Options::username(), Options::password(), Options::public_key(),
@@ -192,10 +200,77 @@ index 157be38a..ac397f64 100644
        if (ccm_->create_cluster(data_center_nodes, is_with_vnodes_, is_password_authenticator_,
                                 is_ssl_, is_client_authentication_)) {
          if (is_ccm_start_requested_) {
-diff --git c/tests/src/integration/options.cpp w/tests/src/integration/options.cpp
+@@ -349,6 +350,13 @@ void Integration::connect(Cluster cluster) {
+              << server_version_.to_string());
+   }
+ 
++  // Check if scylla supports TABLETS feature. If so, and test
++  // does not work with tablets (e.g. it uses LWT), disable the tablets
++  // for test keyspace.
++  if (disable_tablets_ && scylla_supports_feature("TABLETS")) {
++    create_keyspace_query_ = create_keyspace_query_ + " AND TABLETS = { 'enabled': false }";
++  }
++
+   // Create the keyspace for the integration test
+   session_.execute(create_keyspace_query_);
+   CHECK_FAILURE;
+@@ -474,6 +482,19 @@ std::string Integration::generate_contact_points(const std::string& ip_prefix,
+   return implode(contact_points, ',');
+ }
+ 
++bool Integration::scylla_supports_feature(const std::string& feature) {
++  if (!Options::is_scylla()) {
++    return false;
++  }
++
++  Result res = session_.execute("SELECT supported_features FROM system.local WHERE key='local'");
++  Text supported_features = res.first_row().column_by_name<Text>("supported_features");
++  if (supported_features.is_null()) {
++    return false;
++  }
++  return supported_features.value().find(feature) != std::string::npos;
++}
++
+ std::string Integration::format_string(const char* format, ...) const {
+   // Create a buffer for the formatting of the string
+   char buffer[FORMAT_BUFFER_SIZE] = { '\0' };
+diff --git a/tests/src/integration/integration.hpp b/tests/src/integration/integration.hpp
+index 4ac1f6f1..617b4de2 100644
+--- a/tests/src/integration/integration.hpp
++++ b/tests/src/integration/integration.hpp
+@@ -309,6 +309,13 @@ protected:
+    * (DEFAULT: true)
+    */
+   bool is_beta_protocol_;
++  /**
++   * Flag to indicate if tablets should be disabled for Scylla keyspace.
++   * There are some cases where the test logic will fail for tablets keyspace
++   * (e.g. when test uses LWT statements).
++   * (DEFAULT: false)
++   */
++  bool disable_tablets_;
+   /**
+    * Workload to apply to the cluster
+    */
+@@ -508,6 +515,14 @@ protected:
+    */
+   std::string generate_contact_points(const std::string& ip_prefix, size_t number_of_nodes);
+ 
++  /**
++   * Check to see if the Scylla supports a specific feature.
++   *
++   * @param feature Feature to check if supported by Scylla
++   * @return True if Scylla supports the feature; false otherwise
++   */
++   bool scylla_supports_feature(const std::string& feature);
++
+   /**
+    * Variable argument string formatter
+    *
+diff --git a/tests/src/integration/options.cpp b/tests/src/integration/options.cpp
 index 35c46585..db637da7 100644
---- c/tests/src/integration/options.cpp
-+++ w/tests/src/integration/options.cpp
+--- a/tests/src/integration/options.cpp
++++ b/tests/src/integration/options.cpp
 @@ -22,6 +22,7 @@
  
  #include <algorithm>
@@ -261,10 +336,10 @@ index 35c46585..db637da7 100644
  Options::Options() {}
  
  bool Options::bool_value(const std::string& value) {
-diff --git c/tests/src/integration/options.hpp w/tests/src/integration/options.hpp
+diff --git a/tests/src/integration/options.hpp b/tests/src/integration/options.hpp
 index e9ca7f70..255bb676 100644
---- c/tests/src/integration/options.hpp
-+++ w/tests/src/integration/options.hpp
+--- a/tests/src/integration/options.hpp
++++ b/tests/src/integration/options.hpp
 @@ -233,6 +233,14 @@ public:
     * @return True if beta protocol should be enabled; false otherwise
     */
@@ -295,3 +370,20 @@ index e9ca7f70..255bb676 100644
  
    /**
     * Hidden default constructor
+diff --git a/tests/src/integration/tests/test_exec_profile.cpp b/tests/src/integration/tests/test_exec_profile.cpp
+index 2a12b42f..e109e2dd 100644
+--- a/tests/src/integration/tests/test_exec_profile.cpp
++++ b/tests/src/integration/tests/test_exec_profile.cpp
+@@ -183,7 +183,11 @@ private:
+  */
+ class DCExecutionProfileTest : public ExecutionProfileTest {
+ public:
+-  DCExecutionProfileTest() { number_dc2_nodes_ = 1; }
++  DCExecutionProfileTest() {
++    number_dc2_nodes_ = 1;
++    // Disable the use of tablets for this test, since LWT statements are used.
++    disable_tablets_ = true;
++  }
+ 
+   void SetUp() {
+     // Create the execution profiles for the test cases
