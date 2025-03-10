@@ -75,7 +75,7 @@ def extract_n_latest_repo_tags(repo_directory: str, major_versions: List[str], l
     commands = [f"cd {repo_directory}", "git checkout .", ]
     if not os.environ.get("DEV_MODE", False):
         commands.append("git fetch -p --all")
-    commands.append(f"git tag --sort=-creatordate {filter_version} | grep '^[0-9]*\.[0-9]*\.[0-9]*$'")
+    commands.append(f"git tag --sort=-creatordate {filter_version} | grep -E '^[0-9]*\.[0-9]*\.[0-9]*(-1)?$'")
 
     selected_tags = {}
     ignore_tags = set()
